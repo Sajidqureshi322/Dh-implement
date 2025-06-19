@@ -17,13 +17,6 @@ function App() {
     "B.B1": { label: "Child B1", placeholder: "Child of B" },
   };
 
-  // const initialOrder = {
-  //   root: ["A", "B"],
-  //   A: ["A.A1", "A.A2"],
-  //   "A.A1": ["A.A1.A1a"],
-  //   "A.A1.A1a": ["A.A1.A1a.A1a1"],
-  //   B: ["B.B1"],
-  // };
   const initialOrder = {
     root: ["A", "B"],
     A: ["A1", "A2"],
@@ -49,7 +42,8 @@ function App() {
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", width: "100%", gap: "2rem" }}>
       <ShowJson treeData={treeData} setTreeData={handleTreeDataUpdate} setBlocks={setBlocks} setOrder={setOrder} editingKey={editingKey} />
       <div style={{ border: "1px solid black", height: "100vh" }} />
-      <FormPreview blocks={blocks} order={order} setBlocks={setBlocks} setTreeData={setTreeData} editingKey={editingKey} setEditingKey={setEditingKey}/>
+      {/* <FormPreview blocks={blocks} order={order} setBlocks={setBlocks} setTreeData={setTreeData} editingKey={editingKey} setEditingKey={setEditingKey}/> */}
+      <FormPreview blocks={blocks} order={order} setOrder={setOrder} setBlocks={setBlocks} setTreeData={setTreeData} editingKey={editingKey} setEditingKey={setEditingKey}/>
     </div>
   );
 }
