@@ -51,26 +51,35 @@ export const convertToTree = (
 };
 
 
-
-
-
-
 export const convertFromTree = (treeArray) => {
   const blocks = {};
   const order = {};
 
-  const traverse = (nodes, parentKey = "root") => {
-    order[parentKey] = [];
+  const traverse = (nodes, parentPath = "root") => {
+    order[parentPath] = [];
 
     for (const node of nodes) {
-      const { key, label, placeholder, type, children = [] } = node;
+      const { key, fullKey, label, placeholder, type, children = [] } = node;
+      const currentFullKey = fullKey || (parentPath === "root" ? key : `${parentPath}.${key}`);
+      
+      // Save block
+      blocks[currentFullKey] = {
+        key,
+        label,
+        type,
+      };
 
-      blocks[key] = { label, placeholder, type };
-      const childKey = key.split('.').pop();
-      order[parentKey].push(childKey);
+      if (type !== "group" && placeholder) {
+        blocks[currentFullKey].placeholder = placeholder;
+      }
 
+      // Add to order
+      const shortKey = key;
+      order[parentPath].push(shortKey);
+
+      // Traverse children
       if (children.length > 0) {
-        traverse(children, key);
+        traverse(children, currentFullKey);
       }
     }
   };
