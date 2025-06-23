@@ -1,140 +1,5 @@
-// import React from "react";
-// import { convertToTree } from "./utility";
-
-// const renderFormFields = (
-//   blocks,
-//   order,
-//   parentKey = "root",
-//   onEditClick,
-//   editingKey,
-//   handleEditChange,
-//   saveEdit
-// ) => {
-//   const childrenKeys = order[parentKey];
-//   if (!childrenKeys || childrenKeys.length === 0) return null;
-
-//   return (
-//     <ul style={{ listStyle: "none", paddingLeft: "1rem" }}>
-//       {childrenKeys.map((key) => (
-//         <li key={parentKey + "." + key} style={{ marginBottom: "1rem" }}>
-//           <div
-//             style={{
-//               border: "1px solid #ccc",
-//               padding: "1rem",
-//               borderRadius: "8px",
-//               backgroundColor: "#f9f9f9",
-//               marginBottom: "0.5rem",
-//             }}
-//           >
-//             {editingKey === key ? (
-//               <>
-//                 <input
-//                   type="text"
-//                   value={blocks[key]?.label || ""}
-//                   onChange={(e) =>
-//                     handleEditChange(key, "label", e.target.value)
-//                   }
-//                   placeholder="Label"
-//                   style={{ marginBottom: "0.3rem", width: "80%" }}
-//                 />
-//                 <br />
-//                 <input
-//                   type="text"
-//                   value={blocks[key]?.placeholder || ""}
-//                   onChange={(e) =>
-//                     handleEditChange(key, "placeholder", e.target.value)
-//                   }
-//                   placeholder="Placeholder"
-//                   style={{ marginBottom: "0.3rem", width: "80%" }}
-//                 />
-//                 <br />
-//                 <button onClick={saveEdit}>Save</button>
-//               </>
-//             ) : (
-//               <>
-//                 <label style={{ fontWeight: "bold" }}>
-//                   {blocks[key]?.label || key}
-//                 </label>
-//                 <button
-//                   style={{ marginLeft: "12px" }}
-//                   onClick={() => onEditClick(key)}
-//                 >
-//                   Edit
-//                 </button>
-//                 <br />
-//                 <input
-//                   placeholder={blocks[key]?.placeholder || ""}
-//                   style={{
-//                     width: "80%",
-//                     padding: "0.5rem",
-//                     marginTop: "0.3rem",
-//                   }}
-//                 />
-//               </>
-//             )}
-//             {renderFormFields(
-//               blocks,
-//               order,
-//               key,
-//               onEditClick,
-//               editingKey,
-//               handleEditChange,
-//               saveEdit
-//             )}
-//           </div>
-//         </li>
-//       ))}
-//     </ul>
-//   );
-// };
-
-// export default function FormPreview({ blocks, order, setBlocks,setTreeData,editingKey,setEditingKey}) {
-
-//   const handleEditClick = (key) => {
-//     setEditingKey(key);
-//   };
-
-//   const handleEditChange = (key, field, value) => {
-//     setBlocks((prev) => ({
-//       ...prev,
-//       [key]: {
-//         ...prev[key],
-//         [field]: value,
-//       },
-//     }));
-//   };
-
-//   const saveEdit = () => {
-//     setTreeData(convertToTree(blocks,order))
-//     setEditingKey(null);
-//   };
-
-//   return (
-//     <div
-//       style={{
-//         height: "100%",
-//         width: "100%",
-//         padding: "1rem",
-//         overflowY: "auto",
-//       }}
-//     >
-//       <h3>Form Preview</h3>
-//       {/* {renderFormFields(blocks, order,'root',handleClick)} */}
-//       {renderFormFields(
-//         blocks,
-//         order,
-//         "root",
-//         handleEditClick,
-//         editingKey,
-//         handleEditChange,
-//         saveEdit
-//       )}
-//     </div>
-//   );
-// }
-
-import React from "react";
-import { convertToTree } from "./utility";
+import React, { useState } from "react";
+import { convertToTree, generateNewId } from "./utility";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 export default function FormPreview({
@@ -146,9 +11,18 @@ export default function FormPreview({
   editingKey,
   setEditingKey,
 }) {
+  const [openModal, setOpenModal] = useState(false);
+  const [modalParentKey, setModalParentKey] = useState("root");
+  const [newFieldData, setNewFieldData] = useState({
+    label: "",
+    placeholder: "",
+    type: "text",
+  });
+
   const handleEditClick = (key) => {
     setEditingKey(key);
   };
+
   const handleEditChange = (key, field, value) => {
     setBlocks((prev) => ({
       ...prev,
@@ -178,8 +52,38 @@ export default function FormPreview({
     });
   };
 
+  const handleAddField = () => {
+    const id = generateNewId();
+    const newKey = `${modalParentKey}.${id}`;
+
+    const updatedBlocks = {
+      ...blocks,
+      [newKey]: {
+        label: newFieldData.label,
+        type: newFieldData.type,
+        ...(newFieldData.type !== "group" && {
+          placeholder: newFieldData.placeholder,
+        }),
+      },
+    };
+
+    const updatedOrder = {
+      ...order,
+      [modalParentKey]: [...(order[modalParentKey] || []), id],
+    };
+
+    setBlocks(updatedBlocks);
+    setOrder(updatedOrder);
+    setTreeData(convertToTree(updatedBlocks, updatedOrder));
+
+    // Reset
+    setNewFieldData({ label: "", placeholder: "", type: "text" });
+    setOpenModal(false);
+  };
+
   const renderFormFields = (parentKey = "root") => {
     const childrenKeys = order[parentKey];
+    console.log("parent key: ", {parentKey,childrenKeys});
     if (!childrenKeys || childrenKeys.length === 0) return null;
 
     return (
@@ -191,105 +95,134 @@ export default function FormPreview({
               {...provided.droppableProps}
               style={{ listStyle: "none", paddingLeft: "1rem" }}
             >
-              {childrenKeys.map((key, index) => (
-                <Draggable key={key} draggableId={key} index={index}>
-                  {(provided) => (
-                    <li
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      style={{
-                        marginBottom: "1rem",
-                        ...provided.draggableProps.style,
-                      }}
-                    >
-                      <div
+              {childrenKeys.map((key, index) => {
+                const fullKey =
+                  parentKey === "root" ? key : `${parentKey}.${key}`;
+                const block = blocks[fullKey];
+                console.log('blocks : ',{block,fullKey})
+                return (
+                  <Draggable key={key} draggableId={key} index={index}>
+                    {(provided) => (
+                      <li
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
                         style={{
-                          border: "1px solid #ccc",
-                          padding: "1rem",
-                          borderRadius: "8px",
-                          backgroundColor: "#f9f9f9",
-                          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                          position:'relative'
+                          marginBottom: "1rem",
+                          ...provided.draggableProps.style,
                         }}
                       >
-                        <span
-                          {...provided.dragHandleProps}
+                        <div
                           style={{
-                            cursor: "grab",
-                            position: "absolute",
-                            top: "10px",
-                            right: "10px",
-                            fontSize: "1.2rem",
-                            userSelect: "none",
+                            border: "1px solid #ccc",
+                            padding: "1rem",
+                            borderRadius: "8px",
+                            backgroundColor: "#f9f9f9",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                            position: "relative",
                           }}
                         >
-                          ☰
-                        </span>
-                        {editingKey === key ? (
-                          <>
-                            <input
-                              type="text"
-                              value={blocks[key]?.label || ""}
-                              onChange={(e) =>
-                                handleEditChange(key, "label", e.target.value)
-                              }
-                              placeholder="Label"
-                              style={{
-                                marginBottom: "0.3rem",
-                                width: "80%",
-                                display: "block",
-                              }}
-                            />
-                            <input
-                              type="text"
-                              value={blocks[key]?.placeholder || ""}
-                              onChange={(e) =>
-                                handleEditChange(
-                                  key,
-                                  "placeholder",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Placeholder"
-                              style={{
-                                marginBottom: "0.3rem",
-                                width: "80%",
-                                display: "block",
-                              }}
-                            />
-                            <button onClick={saveEdit}>Save</button>
-                          </>
-                        ) : (
-                          <>
-                            <label style={{ fontWeight: "bold" }}>
-                              {blocks[key]?.label || key}
-                            </label>
-                            <button
-                              style={{ marginLeft: "12px" }}
-                              onClick={() => handleEditClick(key)}
-                            >
-                              Edit
-                            </button>
-                            <br />
-                            <input
-                              placeholder={blocks[key]?.placeholder || ""}
-                              style={{
-                                width: "80%",
-                                padding: "0.5rem",
-                                marginTop: "0.3rem",
-                              }}
-                            />
-                          </>
-                        )}
+                          <span
+                            style={{
+                              cursor: "grab",
+                              position: "absolute",
+                              top: "10px",
+                              right: "10px",
+                              fontSize: "1.2rem",
+                              userSelect: "none",
+                            }}
+                          >
+                            ☰
+                          </span>
 
-                        {/* Render children recursively */}
-                        {renderFormFields(key)}
-                      </div>
-                    </li>
-                  )}
-                </Draggable>
-              ))}
+                          {editingKey === fullKey ? (
+                            <>
+                              <input
+                                type="text"
+                                value={block?.label || ""}
+                                onChange={(e) =>
+                                  handleEditChange(
+                                    fullKey,
+                                    "label",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Label"
+                                style={{
+                                  marginBottom: "0.3rem",
+                                  width: "80%",
+                                  display: "block",
+                                }}
+                              />
+                              {block.type !== "group" && (
+                                <input
+                                  type="text"
+                                  value={block?.placeholder || ""}
+                                  onChange={(e) =>
+                                    handleEditChange(
+                                      fullKey,
+                                      "placeholder",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="Placeholder"
+                                  style={{
+                                    marginBottom: "0.3rem",
+                                    width: "80%",
+                                    display: "block",
+                                  }}
+                                />
+                              )}
+                              <button onClick={saveEdit}>Save</button>
+                            </>
+                          ) : (
+                            <>
+                              <label style={{ fontWeight: "bold" }}>
+                                {block?.label || fullKey}
+                              </label>
+                              <button
+                                style={{ marginLeft: "12px" }}
+                                onClick={() => handleEditClick(fullKey)}
+                              >
+                                Edit
+                              </button>
+
+                              {/* Only for group */}
+                              {block?.type === "group" && (
+                                <button
+                                  style={{ marginLeft: "10px" }}
+                                  onClick={() => {
+                                    setModalParentKey(fullKey);
+                                    setOpenModal(true);
+                                  }}
+                                >
+                                  ➕ Add Field
+                                </button>
+                              )}
+                              <br />
+
+                              {block?.type !== "group" && (
+                                <input
+                                  placeholder={block?.placeholder || ""}
+                                  style={{
+                                    width: "80%",
+                                    padding: "0.5rem",
+                                    marginTop: "0.3rem",
+                                  }}
+                                  type={block?.type || "text"}
+                                />
+                              )}
+                            </>
+                          )}
+
+                          {/* Children - only for group */}
+                          {block?.type === "group" && renderFormFields(fullKey)}
+                        </div>
+                      </li>
+                    )}
+                  </Draggable>
+                );
+              })}
               {provided.placeholder}
             </ul>
           )}
@@ -309,6 +242,81 @@ export default function FormPreview({
     >
       <h3>Form Preview (Draggable)</h3>
       {renderFormFields("root")}
+
+      {/* Modal */}
+      {openModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "1.5rem",
+              borderRadius: "8px",
+              minWidth: "300px",
+            }}
+          >
+            <h3>Add New Field</h3>
+            <input
+              type="text"
+              placeholder="Label"
+              value={newFieldData.label}
+              onChange={(e) =>
+                setNewFieldData({ ...newFieldData, label: e.target.value })
+              }
+              style={{ width: "100%", marginBottom: "0.5rem" }}
+            />
+            {newFieldData.type !== "group" && (
+              <input
+                type="text"
+                placeholder="Placeholder"
+                value={newFieldData.placeholder}
+                onChange={(e) =>
+                  setNewFieldData({
+                    ...newFieldData,
+                    placeholder: e.target.value,
+                  })
+                }
+                style={{ width: "100%", marginBottom: "0.5rem" }}
+              />
+            )}
+            <select
+              value={newFieldData.type}
+              onChange={(e) =>
+                setNewFieldData({ ...newFieldData, type: e.target.value })
+              }
+              style={{ width: "100%", marginBottom: "0.5rem" }}
+            >
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="email">Email</option>
+              <option value="date">Date</option>
+              <option value="group">Group</option>
+            </select>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+              }}
+            >
+              <button onClick={() => setOpenModal(false)}>Cancel</button>
+              <button onClick={handleAddField}>Add</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,7 +11,6 @@ export default function ShowJson({
   const [jsonText, setJsonText] = useState(JSON.stringify(treeData, null, 2));
 
   useEffect(() => {
-    console.log("use effect in show json");
     setJsonText(JSON.stringify(treeData, null, 2));
   }, [treeData]);
 
@@ -30,7 +29,6 @@ export default function ShowJson({
       console.error(err);
     }
   };
-  console.log("json text : ", jsonText);
   return (
     <>
       <div
