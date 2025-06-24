@@ -18,10 +18,9 @@ export default function FormPreview({
     placeholder: "",
     type: "text",
   });
+  const [formValues, setFormValues] = useState({});
 
-  const handleEditClick = (key) => {
-    setEditingKey(key);
-  };
+  const handleEditClick = (key) => setEditingKey(key);
 
   const handleEditChange = (key, field, value) => {
     setBlocks((prev) => ({
@@ -40,7 +39,6 @@ export default function FormPreview({
 
   const handleDragEnd = (result, parentKey) => {
     if (!result.destination) return;
-
     const newOrder = Array.from(order[parentKey]);
     const [removed] = newOrder.splice(result.source.index, 1);
     newOrder.splice(result.destination.index, 0, removed);
@@ -75,16 +73,13 @@ export default function FormPreview({
     setBlocks(updatedBlocks);
     setOrder(updatedOrder);
     setTreeData(convertToTree(updatedBlocks, updatedOrder));
-
-    // Reset
     setNewFieldData({ label: "", placeholder: "", type: "text" });
     setOpenModal(false);
   };
 
   const renderFormFields = (parentKey = "root") => {
     const childrenKeys = order[parentKey];
-    console.log("parent key: ", {parentKey,childrenKeys});
-    if (!childrenKeys || childrenKeys.length === 0) return null;
+    if (!childrenKeys?.length) return null;
 
     return (
       <DragDropContext onDragEnd={(result) => handleDragEnd(result, parentKey)}>
@@ -99,7 +94,7 @@ export default function FormPreview({
                 const fullKey =
                   parentKey === "root" ? key : `${parentKey}.${key}`;
                 const block = blocks[fullKey];
-                console.log('blocks : ',{block,fullKey})
+
                 return (
                   <Draggable key={key} draggableId={key} index={index}>
                     {(provided) => (
@@ -118,7 +113,6 @@ export default function FormPreview({
                             padding: "1rem",
                             borderRadius: "8px",
                             backgroundColor: "#f9f9f9",
-                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                             position: "relative",
                           }}
                         >
@@ -187,7 +181,6 @@ export default function FormPreview({
                                 Edit
                               </button>
 
-                              {/* Only for group */}
                               {block?.type === "group" && (
                                 <button
                                   style={{ marginLeft: "10px" }}
@@ -202,20 +195,109 @@ export default function FormPreview({
                               <br />
 
                               {block?.type !== "group" && (
-                                <input
-                                  placeholder={block?.placeholder || ""}
-                                  style={{
-                                    width: "80%",
-                                    padding: "0.5rem",
-                                    marginTop: "0.3rem",
-                                  }}
-                                  type={block?.type || "text"}
-                                />
+                                <>
+                                  {block?.type === "dropdown" ? (
+                                    <select
+                                      style={{
+                                        width: "80%",
+                                        padding: "0.5rem",
+                                        marginTop: "0.3rem",
+                                      }}
+                                      value={formValues[fullKey] || ""}
+                                      onFocus={async () => {
+                                        if (
+                                          fullKey === "A" &&
+                                          (block.options || []).length === 0
+                                        ) {
+                                          const res = await fetch(
+                                            "https://restcountries.com/v3.1/all?fields=name"
+                                          );
+                                          const data = await res.json();
+                                          const countryList = data
+                                            .map((item) => item.name.common)
+                                            .sort();
+
+                                          setBlocks((prev) => ({
+                                            ...prev,
+                                            [fullKey]: {
+                                              ...prev[fullKey],
+                                              options: countryList,
+                                            },
+                                          }));
+                                        }
+                                      }}
+                                      onChange={async (e) => {
+                                        const newValue = e.target.value;
+                                        setFormValues((prev) => ({
+                                          ...prev,
+                                          [fullKey]: newValue,
+                                        }));
+                                        if (fullKey === "A" && newValue) {
+                                          const stateRes = await fetch(
+                                            "https://countriesnow.space/api/v0.1/countries/states",
+                                            {
+                                              method: "POST",
+                                              headers: {
+                                                "Content-Type":
+                                                  "application/json",
+                                              },
+                                              body: JSON.stringify({
+                                                country: newValue,
+                                              }),
+                                            }
+                                          );
+
+                                          const stateData =
+                                            await stateRes.json();
+                                          const statesList =
+                                            stateData.data?.states?.map(
+                                              (s) => s.name
+                                            ) || [];
+
+                                          setBlocks((prev) => {
+                                            const newBlocks = { ...prev };
+                                            for (let key in prev) {
+                                              const blk = prev[key];
+                                              if (
+                                                blk.type === "dropdown" &&
+                                                blk.depends_on?.some(
+                                                  (d) => d.field === "A"
+                                                )
+                                              ) {
+                                                newBlocks[key] = {
+                                                  ...blk,
+                                                  options: statesList,
+                                                };
+                                              }
+                                            }
+                                            return newBlocks;
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <option value="">--Select--</option>
+                                      {(block?.options || []).map((opt, i) => (
+                                        <option key={i} value={opt}>
+                                          {opt}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <input
+                                      placeholder={block?.placeholder || ""}
+                                      style={{
+                                        width: "80%",
+                                        padding: "0.5rem",
+                                        marginTop: "0.3rem",
+                                      }}
+                                      type={block?.type || "text"}
+                                    />
+                                  )}
+                                </>
                               )}
                             </>
                           )}
 
-                          {/* Children - only for group */}
                           {block?.type === "group" && renderFormFields(fullKey)}
                         </div>
                       </li>
@@ -243,7 +325,6 @@ export default function FormPreview({
       <h3>Form Preview (Draggable)</h3>
       {renderFormFields("root")}
 
-      {/* Modal */}
       {openModal && (
         <div
           style={{
@@ -302,6 +383,7 @@ export default function FormPreview({
               <option value="number">Number</option>
               <option value="email">Email</option>
               <option value="date">Date</option>
+              <option value="dropdown">Dropdown</option>
               <option value="group">Group</option>
             </select>
             <div
