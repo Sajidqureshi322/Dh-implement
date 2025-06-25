@@ -23,15 +23,99 @@ export default function FormPreview({
     setEditingKey(key);
   };
 
+  // const handleEditChange = (key, field, value) => {
+  //   setBlocks((prev) => {
+  //     const updated = {
+  //       ...prev,
+  //       [key]: {
+  //         ...prev[key],
+  //         [field]: value,
+  //       },
+  //     };
+  
+  //     // ✅ Also update treeData after every change
+  //     setTreeData(convertToTree(updated, order));
+  
+  //     return updated;
+  //   });
+    
+  // };
+  // const handleEditChange = (key, field, value) => {
+  //   setBlocks((prev) => {
+  //     console.log("prev : ",prev)
+  //     const updated = {
+  //       ...prev,
+  //       [key]: {
+  //         ...prev[key],
+  //         [field]: value,
+  //       },
+  //     };
+  
+  //     // 🔁 If value changed, reset dependents
+  //     if (field === "value") {
+  //       Object.entries(prev).forEach(([otherKey, otherBlock]) => {
+  //         console.log({otherBlock,otherKey})
+  //         if (
+  //           Array.isArray(otherBlock.depends_on) &&
+  //           otherBlock.depends_on.includes(key)
+  //         ) {
+  //           updated[otherKey] = {
+  //             ...updated[otherKey],
+  //             value: "", // Reset dependent value
+  //           };
+  //         }
+  //       });
+  //     }
+  
+  //     // Update the treeData as well
+  //     setTreeData(convertToTree(updated, order));
+  //     return updated;
+  //   });
+  // };
+  console.log('blocks : ',blocks)
   const handleEditChange = (key, field, value) => {
-    setBlocks((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        [field]: value,
-      },
-    }));
+    setBlocks((prev) => {
+      const updated = {
+        ...prev,
+        [key]: {
+          ...prev[key],
+          [field]: value,
+        },
+      };
+  
+      // Only if changing `value` field
+      if (field === "value") {
+        // Step 1: Build reverse dependency graph
+        const reverseDepMap = {};
+        for (const [k, b] of Object.entries(updated)) {
+          if (b.depends_on) {
+            for (const dep of b.depends_on) {
+              if (!reverseDepMap[dep]) reverseDepMap[dep] = [];
+              reverseDepMap[dep].push(k);
+            }
+          }
+        }
+  
+        // Step 2: Recursively clear all dependents of this key
+        const clearDependents = (targetKey) => {
+          if (!reverseDepMap[targetKey]) return;
+  
+          for (const depKey of reverseDepMap[targetKey]) {
+            if (updated[depKey]?.value !== "") {
+              updated[depKey].value = "";
+            }
+            clearDependents(depKey); // Recursively clear further
+          }
+        };
+  
+        clearDependents(key);
+      }
+  
+      setTreeData(convertToTree(updated, order));
+      return updated;
+    });
   };
+    
 
   const saveEdit = () => {
     setTreeData(convertToTree(blocks, order));
@@ -66,6 +150,8 @@ export default function FormPreview({
         }),
       },
     };
+    if(newFieldData.type !== 'group')
+        updatedBlocks.value = "";
 
     const updatedOrder = {
       ...order,
@@ -81,9 +167,10 @@ export default function FormPreview({
     setOpenModal(false);
   };
 
+  
+
   const renderFormFields = (parentKey = "root") => {
     const childrenKeys = order[parentKey];
-    console.log("parent key: ", {parentKey,childrenKeys});
     if (!childrenKeys || childrenKeys.length === 0) return null;
 
     return (
@@ -99,7 +186,15 @@ export default function FormPreview({
                 const fullKey =
                   parentKey === "root" ? key : `${parentKey}.${key}`;
                 const block = blocks[fullKey];
-                console.log('blocks : ',{block,fullKey})
+                // Check depends_on logic
+                if (block?.depends_on?.length > 0) {
+                  const shouldRender = block.depends_on.every((depKey) => {
+                    const depBlock = blocks[depKey];
+                    return depBlock && depBlock.value !== "";
+                  });
+                  if (!shouldRender) return null;
+                }
+
                 return (
                   <Draggable key={key} draggableId={key} index={index}>
                     {(provided) => (
@@ -210,6 +305,14 @@ export default function FormPreview({
                                     marginTop: "0.3rem",
                                   }}
                                   type={block?.type || "text"}
+                                  onChange={(e) =>
+                                    handleEditChange(
+                                      fullKey,
+                                      "value",
+                                      e.target.value
+                                    )
+                                  }
+                                  value={block?.value || ""}
                                 />
                               )}
                             </>

@@ -20,12 +20,14 @@ function App() {
       label: "Child A1a1",
       placeholder: "Inside A1a1",
       type: "text",
+      value:''
     },
     "A.A2": {
       key: "A2",
       label: "Child A2",
       placeholder: "Child of A",
       type: "text",
+      value:''
     },
     B: { key: "B", fullKey: "B", label: "Root2", type: "group" },
     "B.B1": {
@@ -33,11 +35,35 @@ function App() {
       label: "Child B1",
       placeholder: "Child of B",
       type: "text",
+      value:''
+    },
+    "C": {
+      key: "C",
+      label: "Root C",
+      placeholder: "Root c",
+      type: "text",
+      value:''
+    },
+    "D": {
+      key: "D",
+      label: "Root D",
+      placeholder: "Root D",
+      type: "text",
+      value:'',
+      depends_on: ['C']
+    },
+    "E": {
+      key: "E",
+      label: "Root E",
+      placeholder: "Root E",
+      type: "text",
+      value:'',
+      depends_on: ['D']
     },
   };
 
   const initialOrder = {
-    root: ["A", "B"],
+    root: ["A", "B","C","D","E"],
     A: ["A1", "A2"],
     "A.A1": ["A1a"],
     "A.A1.A1a": ["A1a1"],
