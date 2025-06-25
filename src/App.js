@@ -50,6 +50,13 @@ function App() {
     convertToTree(initialBlocks, initialOrder)
   );
 
+  const [dropdownValues, setDropdownValues] = useState({
+    country: "",
+    state: "",
+    city: "",
+    village: "",
+  });
+
   const handleTreeDataUpdate = (newTreeData) => {
     setTreeData(newTreeData);
     const { blocks: newBlocks, order: newOrder } = convertFromTree(newTreeData);
@@ -74,6 +81,7 @@ function App() {
         setBlocks={setBlocks}
         setOrder={setOrder}
         editingKey={editingKey}
+        dropdownValues={dropdownValues}
       />
       <div style={{ border: "1px solid black", height: "100vh" }} />
       <FormPreview
@@ -84,6 +92,8 @@ function App() {
         setTreeData={setTreeData}
         editingKey={editingKey}
         setEditingKey={setEditingKey}
+        dropdownValues={dropdownValues}
+        setDropdownValues={setDropdownValues}
       />
     </div>
   );

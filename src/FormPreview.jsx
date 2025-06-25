@@ -1,5 +1,7 @@
+// Inside FormPreview.jsx
+
 import React, { useState } from "react";
-import { convertToTree, generateNewId } from "./utility";
+import { convertToTree } from "./utility";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 export default function FormPreview({
@@ -10,37 +12,168 @@ export default function FormPreview({
   setTreeData,
   editingKey,
   setEditingKey,
+  dropdownValues,
+  setDropdownValues,
 }) {
-  const [openModal, setOpenModal] = useState(false);
-  const [modalParentKey, setModalParentKey] = useState("root");
-  const [newFieldData, setNewFieldData] = useState({
-    label: "",
-    placeholder: "",
-    type: "text",
-  });
+  const [code, setCode] = useState("// Write your JS code here\n");
+  const [dynamicDropdowns, setDynamicDropdowns] = useState([]);
+  const [dropdownData, setDropdownData] = useState({});
 
-  const handleEditClick = (key) => {
-    setEditingKey(key);
+  const handleProcessCode = () => {
+    try {
+      // eslint-disable-next-line no-new-func
+      const func = new Function("dropdownData", code);
+      const result = func(dropdownData);
+      if (Array.isArray(result)) {
+        setDynamicDropdowns(result);
+        setDropdownData({});
+        alert("Dropdowns generated successfully.");
+      } else {
+        alert("JS code must return an array of dropdown configs.");
+      }
+    } catch (err) {
+      alert("Error in JS code: " + err.message);
+    }
   };
 
-  const handleEditChange = (key, field, value) => {
-    setBlocks((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        [field]: value,
-      },
-    }));
+  const handleDropdownChange = (key, value) => {
+   const updatedData = { ...dropdownData, [key]: value };
+
+// Reset dependent dropdowns
+dynamicDropdowns.forEach((dropdown) => {
+  if (dropdown.dependsOn === key) {
+    updatedData[dropdown.key] = ""; // Clear child value
+  }
+});
+
+setDropdownData(updatedData);
+
   };
 
-  const saveEdit = () => {
-    setTreeData(convertToTree(blocks, order));
-    setEditingKey(null);
+  const locationDataArray = [
+    {
+      country: "India",
+      states: [
+        {
+          state: "Maharashtra",
+          cities: [
+            {
+              city: "Pune",
+              villages: ["Baner", "Hinjewadi"],
+            },
+            {
+              city: "Mumbai",
+              villages: ["Andheri", "Borivali"],
+            },
+          ],
+        },
+        {
+          state: "Gujarat",
+          cities: [
+            {
+              city: "Surat",
+              villages: ["Adajan", "Katargam"],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      country: "USA",
+      states: [
+        {
+          state: "California",
+          cities: [
+            {
+              city: "SanFrancisco",
+              villages: ["Downtown", "SOMA"],
+            },
+            {
+              city: "LA",
+              villages: ["Hollywood", "Venice"],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const getStates = (country) => {
+    return (
+      locationDataArray.find((c) => c.country === country)?.states || []
+    ).map((s) => s.state);
+  };
+
+  const getCities = (country, state) => {
+    const states = locationDataArray.find((c) => c.country === country)?.states || [];
+    const stateObj = states.find((s) => s.state === state);
+    return (stateObj?.cities || []).map((c) => c.city);
+  };
+
+  const getVillages = (country, state, city) => {
+    const states = locationDataArray.find((c) => c.country === country)?.states || [];
+    const stateObj = states.find((s) => s.state === state);
+    const cityObj = stateObj?.cities.find((c) => c.city === city);
+    return cityObj?.villages || [];
+  };
+
+  const dropdownFields = [
+    {
+      key: "country",
+      label: "Country",
+      options: locationDataArray.map((c) => c.country),
+      dependsOn: null,
+    },
+    {
+      key: "state",
+      label: "State",
+      options: dropdownValues.country ? getStates(dropdownValues.country) : [],
+      dependsOn: "country",
+    },
+    {
+      key: "city",
+      label: "City",
+      options:
+        dropdownValues.country && dropdownValues.state
+          ? getCities(dropdownValues.country, dropdownValues.state)
+          : [],
+      dependsOn: "state",
+    },
+    {
+      key: "village",
+      label: "Village",
+      options:
+        dropdownValues.country &&
+        dropdownValues.state &&
+        dropdownValues.city
+          ? getVillages(
+              dropdownValues.country,
+              dropdownValues.state,
+              dropdownValues.city
+            )
+          : [],
+      dependsOn: "city",
+    },
+  ];
+
+  const updateDropdown = (key, value) => {
+    const newValues = { ...dropdownValues, [key]: value };
+    const keysToReset = dropdownFields
+      .filter(
+        (field) =>
+          field.dependsOn === key || field.dependsOn?.startsWith(key)
+      )
+      .map((field) => field.key);
+
+    for (let resetKey of keysToReset) {
+      newValues[resetKey] = "";
+    }
+
+    setDropdownValues(newValues);
   };
 
   const handleDragEnd = (result, parentKey) => {
     if (!result.destination) return;
-
     const newOrder = Array.from(order[parentKey]);
     const [removed] = newOrder.splice(result.source.index, 1);
     newOrder.splice(result.destination.index, 0, removed);
@@ -52,38 +185,8 @@ export default function FormPreview({
     });
   };
 
-  const handleAddField = () => {
-    const id = generateNewId();
-    const newKey = `${modalParentKey}.${id}`;
-
-    const updatedBlocks = {
-      ...blocks,
-      [newKey]: {
-        label: newFieldData.label,
-        type: newFieldData.type,
-        ...(newFieldData.type !== "group" && {
-          placeholder: newFieldData.placeholder,
-        }),
-      },
-    };
-
-    const updatedOrder = {
-      ...order,
-      [modalParentKey]: [...(order[modalParentKey] || []), id],
-    };
-
-    setBlocks(updatedBlocks);
-    setOrder(updatedOrder);
-    setTreeData(convertToTree(updatedBlocks, updatedOrder));
-
-    // Reset
-    setNewFieldData({ label: "", placeholder: "", type: "text" });
-    setOpenModal(false);
-  };
-
   const renderFormFields = (parentKey = "root") => {
     const childrenKeys = order[parentKey];
-    console.log("parent key: ", {parentKey,childrenKeys});
     if (!childrenKeys || childrenKeys.length === 0) return null;
 
     return (
@@ -99,7 +202,7 @@ export default function FormPreview({
                 const fullKey =
                   parentKey === "root" ? key : `${parentKey}.${key}`;
                 const block = blocks[fullKey];
-                console.log('blocks : ',{block,fullKey})
+
                 return (
                   <Draggable key={key} draggableId={key} index={index}>
                     {(provided) => (
@@ -134,88 +237,21 @@ export default function FormPreview({
                           >
                             ☰
                           </span>
-
-                          {editingKey === fullKey ? (
-                            <>
-                              <input
-                                type="text"
-                                value={block?.label || ""}
-                                onChange={(e) =>
-                                  handleEditChange(
-                                    fullKey,
-                                    "label",
-                                    e.target.value
-                                  )
-                                }
-                                placeholder="Label"
-                                style={{
-                                  marginBottom: "0.3rem",
-                                  width: "80%",
-                                  display: "block",
-                                }}
-                              />
-                              {block.type !== "group" && (
-                                <input
-                                  type="text"
-                                  value={block?.placeholder || ""}
-                                  onChange={(e) =>
-                                    handleEditChange(
-                                      fullKey,
-                                      "placeholder",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Placeholder"
-                                  style={{
-                                    marginBottom: "0.3rem",
-                                    width: "80%",
-                                    display: "block",
-                                  }}
-                                />
-                              )}
-                              <button onClick={saveEdit}>Save</button>
-                            </>
-                          ) : (
-                            <>
-                              <label style={{ fontWeight: "bold" }}>
-                                {block?.label || fullKey}
-                              </label>
-                              <button
-                                style={{ marginLeft: "12px" }}
-                                onClick={() => handleEditClick(fullKey)}
-                              >
-                                Edit
-                              </button>
-
-                              {/* Only for group */}
-                              {block?.type === "group" && (
-                                <button
-                                  style={{ marginLeft: "10px" }}
-                                  onClick={() => {
-                                    setModalParentKey(fullKey);
-                                    setOpenModal(true);
-                                  }}
-                                >
-                                  ➕ Add Field
-                                </button>
-                              )}
-                              <br />
-
-                              {block?.type !== "group" && (
-                                <input
-                                  placeholder={block?.placeholder || ""}
-                                  style={{
-                                    width: "80%",
-                                    padding: "0.5rem",
-                                    marginTop: "0.3rem",
-                                  }}
-                                  type={block?.type || "text"}
-                                />
-                              )}
-                            </>
+                          <label style={{ fontWeight: "bold" }}>
+                            {block?.label || fullKey}
+                          </label>
+                          <br />
+                          {block?.type !== "group" && (
+                            <input
+                              placeholder={block?.placeholder || ""}
+                              style={{
+                                width: "80%",
+                                padding: "0.5rem",
+                                marginTop: "0.3rem",
+                              }}
+                              type={block?.type || "text"}
+                            />
                           )}
-
-                          {/* Children - only for group */}
                           {block?.type === "group" && renderFormFields(fullKey)}
                         </div>
                       </li>
@@ -232,91 +268,120 @@ export default function FormPreview({
   };
 
   return (
-    <div
-      style={{
-        height: "100%",
-        width: "100%",
-        padding: "1rem",
-        overflowY: "auto",
-      }}
-    >
+    <div style={{ height: "100%", width: "100%", padding: "1rem", overflowY: "auto" }}>
       <h3>Form Preview (Draggable)</h3>
       {renderFormFields("root")}
 
-      {/* Modal */}
-      {openModal && (
-        <div
+      {/* Location Dropdowns */}
+      <div style={{ marginTop: "2rem", width: "80%" }}>
+        <h3>Location Selector</h3>
+        {dropdownFields.map((field) => {
+          const show = !field.dependsOn || dropdownValues[field.dependsOn] !== "";
+
+          return (
+            show && (
+              <div key={field.key} style={{ marginBottom: "1rem" }}>
+                <label style={{ fontWeight: "bold", display: "block", marginBottom: "0.3rem" }}>
+                  {field.label}
+                </label>
+                <select
+                  value={dropdownValues[field.key]}
+                  onChange={(e) => updateDropdown(field.key, e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "0.6rem",
+                    fontSize: "1rem",
+                    borderRadius: "6px",
+                    border: "1px solid #ccc",
+                  }}
+                >
+                  <option value="">Select {field.label}</option>
+                  {field.options.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
+          );
+        })}
+      </div>
+
+      {/* JS Code Editor */}
+      <div style={{ marginTop: "2rem", width: "80%" }}>
+        <h3>Custom JavaScript Editor</h3>
+        <textarea
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          rows={10}
           style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
+            width: "100%",
+            padding: "1rem",
+            fontFamily: "monospace",
+            fontSize: "1rem",
+            backgroundColor: "#1e1e1e",
+            color: "#dcdcdc",
+            borderRadius: "6px",
+            border: "1px solid #555",
           }}
+        />
+
+        <button
+          onClick={handleProcessCode}
+          style={{
+            marginTop: "1rem",
+            padding: "0.6rem 1.2rem",
+            backgroundColor: "#4CAF50",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}  
         >
-          <div
-            style={{
-              background: "white",
-              padding: "1.5rem",
-              borderRadius: "8px",
-              minWidth: "300px",
-            }}
-          >
-            <h3>Add New Field</h3>
-            <input
-              type="text"
-              placeholder="Label"
-              value={newFieldData.label}
-              onChange={(e) =>
-                setNewFieldData({ ...newFieldData, label: e.target.value })
-              }
-              style={{ width: "100%", marginBottom: "0.5rem" }}
-            />
-            {newFieldData.type !== "group" && (
-              <input
-                type="text"
-                placeholder="Placeholder"
-                value={newFieldData.placeholder}
-                onChange={(e) =>
-                  setNewFieldData({
-                    ...newFieldData,
-                    placeholder: e.target.value,
-                  })
-                }
-                style={{ width: "100%", marginBottom: "0.5rem" }}
-              />
-            )}
-            <select
-              value={newFieldData.type}
-              onChange={(e) =>
-                setNewFieldData({ ...newFieldData, type: e.target.value })
-              }
-              style={{ width: "100%", marginBottom: "0.5rem" }}
-            >
-              <option value="text">Text</option>
-              <option value="number">Number</option>
-              <option value="email">Email</option>
-              <option value="date">Date</option>
-              <option value="group">Group</option>
-            </select>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "0.5rem",
-              }}
-            >
-              <button onClick={() => setOpenModal(false)}>Cancel</button>
-              <button onClick={handleAddField}>Add</button>
-            </div>
+          Process Code
+        </button>
+
+        {/* Dynamic Dropdowns */}
+        {dynamicDropdowns.length > 0 && (
+          <div style={{ marginTop: "2rem" }}>
+            <h3>Dynamic Dropdowns</h3>
+            {dynamicDropdowns.map((dropdown) => {
+              const shouldShow =
+                !dropdown.dependsOn ||
+                dropdownData[dropdown.dependsOn] === dropdown.value;
+
+              return (
+                shouldShow && (
+                  <div key={dropdown.key} style={{ marginBottom: "1rem" }}>
+                    <label style={{ fontWeight: "bold", display: "block", marginBottom: "0.3rem" }}>
+                      {dropdown.key}:
+                    </label>
+                    <select
+                      value={dropdownData[dropdown.key] || ""}
+                      onChange={(e) => handleDropdownChange(dropdown.key, e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "0.6rem",
+                        fontSize: "1rem",
+                        borderRadius: "6px",
+                        border: "1px solid #ccc",
+                      }}
+                    >
+                      <option value="">Select</option>
+                      {dropdown.options.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
